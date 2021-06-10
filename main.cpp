@@ -100,7 +100,7 @@ parseOscMessages(std::vector<osc::ReceivedMessage> messages) {
       for (int i = 0; i < 127; i++) {
         const auto v = (args++)->AsInt32();
         // ignore some values (read: do not change value)
-        if (v > 0) {
+        if (v >= 0) {
           // put them into the mm's msgs vector
           std::vector<unsigned char> cc{0xb0 | chan, i + 1, v};
           mm.msgs.push_back(cc);
