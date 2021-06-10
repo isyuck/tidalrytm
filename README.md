@@ -17,4 +17,4 @@ tidalrytm fixes this, and adds some other useful functions for controlling the r
 
 it doesn't rely on superdirt or supercollider at all, so all you need is a working tidal install and a rytm.
 
-this is a small cpp project, requiring `oscpack` and `rtmidi`. build with `make`, run with `make run`. make sure to use the included `BootTidal.hs` rather than whatever your editors default is.
+this is a small cpp project, requiring `oscpack` and `rtmidi`. build with `make`, run with `make run`. make sure to use the included `BootTidal.hs` rather than whatever your editors default is, and to set the tempo of the rytm to the tempo of tidal. e.g. `setcps(120/60/4)` for 120 bpm on the rytm.
