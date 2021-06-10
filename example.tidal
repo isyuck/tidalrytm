@@ -1,0 +1,25 @@
+setcps(0.5)
+
+rytm [
+  whenmod 6 4 (density 0)
+  $ fast "1 2" $ track 2 $ (n "0 2 4 8" |+ "<0 2 4>")
+  # fltr 5 (range 0.3 0.9 $ slow 3 $ sine)
+  # fltr 6 (range 0.0 0.4 $ slow 2 $ sine)
+  # amp 3 0.5
+  ,
+  whenmod 6 4 (fast 2) $ track 1 $ n "0(3,8)"
+  ,
+  every 3 (ply "4") $ track 4 $ n "~ 4"
+  ,
+  within (0, 0.5) (plyWith 2 (# fltr 5 (range 0.5 1 $ rand)))
+  $ track 9
+  $ n "0*4"
+  # fltr 5 1
+  ,
+  track 10 $ n "0"
+  ]
+
+  rytm [ track 2 $ segment 128 $ fltr 5 (sine) ]
+
+
+hush
