@@ -1,0 +1,140 @@
+
+    track :: Pattern Int -> Pattern ValueMap -> Pattern ValueMap
+    track n p = p # pItrack (n |- 1)
+    --
+    tr = track
+    --
+    bd = track 1
+    sd = track 2
+    rs = track 3
+    cp = track 4
+    bt = track 5
+    lt = track 6
+    mt = track 7
+    ht = track 8
+    ch = track 9
+    oh = track 10
+    cy = track 11
+    cb = track 12
+    --
+    attack = amp 1
+    hold = amp 2
+    decay = amp 3
+    overdrive = amp 4
+    od = overdrive
+    verb = amp 6
+    pan = rytmcc 11 0
+    gain = rytmcc 8 0
+    --
+    fatt = fltr 1
+    fhol = fltr 2
+    fsus = fltr 3
+    frel = fltr 4
+    freq = fltr 5
+    res = fltr 6
+    ftyp = fltr 7 -- TODO needs better selection
+    fenv = fltr 8
+    --
+    smpltune = smpl 1
+    smplfine = smpl 2
+    crush = smpl 3
+    bank = smpl 4
+    start = smpl 5
+    end = smpl 6
+    loop = smpl 7
+    smplvol = smpl 8
+    --
+    machine = rytmccInt 15
+    --
+    --
+    -- mute a track "n", or a list "[n1, n2]"
+    mute :: Pattern Int -> ControlPattern -> ControlPattern
+    mute n = fix (# pItrack (-1)) (pItrack (n |- 1))
+    -- solo a track "n", or a list "[n1, n2]"
+    solo :: Pattern Int -> ControlPattern -> ControlPattern
+    solo n = unfix (# pItrack (-1)) (pItrack (n |- 1))
+    -- mute a track within a cycle
+    mutew t n = within t (mute n)
+    -- solo a track within a cycle
+    solow t n = within t (solo n)
+    --
+    -- move the track up/down, by n. trmv 2 will change patterns
+    -- on track 5 to track 7, track 1 to track 3... etc
+    trmv n = (|+ pItrack n)
+    --
+    machineMap "bdhard" = 0
+    machineMap "bd" = 0
+    machineMap "bdclassic" = 1
+    machineMap "sdhard" = 2
+    machineMap "sd" = 2
+    machineMap "sdclassic" = 3
+    machineMap "rshard" = 4
+    machineMap "rsclassic" = 5
+    machineMap "rs" = 5
+    machineMap "cp" = 6
+    machineMap "bt" = 7
+    machineMap "xt" = 7
+    machineMap "chclassic" = 9
+    machineMap "ch" = 9
+    machineMap "ohclassic" = 10
+    machineMap "oh" = 10
+    machineMap "cyclassic" = 11
+    machineMap "cy" = 11
+    machineMap "cbclassic" = 12
+    machineMap "cb" = 12
+    machineMap "bdfm" = 13
+    machineMap "sdfm" = 14
+    machineMap "noise" = 15
+    machineMap "impulse" = 16
+    machineMap "chmetal" = 17
+    machineMap "ohmetal" = 18
+    machineMap "cymetal" = 19
+    machineMap "cbmetal" = 20
+    machineMap "bdplastic" = 21
+    machineMap "bdsilky" = 22
+    machineMap "sdnatural" = 23
+    machineMap "hh" = 24
+    machineMap "cyride" = 25
+    machineMap "bdsharp" = 26
+    machineMap "disabled" = 27
+    machineMap "vco" = 28
+    machineMap "dualvco" = 28
+    --
+    sound :: Pattern String -> ControlPattern
+    sound = machine . fmap machineMap
+    s = sound
+    --
+    rn = range
+    --
+    vtune v = rytmccInt 17 (v + 64)
+    vdetune v = rytmccInt 20 (v + 64)
+    vwav = rytmccInt 21
+
+
+rytm
+  $ whenmod 6 4 (mute 10)
+  $ whenmod 6 5 (mute 1)
+  $ stack [
+  tr 9
+  $ sometimes (# s "ohmetal")
+  $ (|+ n (slow 2 $ irand 16))
+  $ n "0(9,16)" # s "chmetal"
+  # od 0
+  # freq (rn 0.7 1 $ slow 3 sine)
+  # res 0.1 # gain 0.7
+  ,
+  tr 1 $ n "0*4"
+  # od (rn 0 0.1 $ fast 4 rand)
+  # gain 0.8
+  ,
+  tr 10 $ n "0*4" # freq (rn 0.8 1 $ rand)
+  ]
+
+  rytm $ tr 1 $ n "0*2"
+
+
+  once $ tr 1 $ n "0"
+
+setcps(120/60/4)
+
+hush
