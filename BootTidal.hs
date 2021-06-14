@@ -10,7 +10,7 @@ hSetEncoding stdout utf8
 let target = Target {oName = "tidalrytm",
                      oAddress = "127.0.0.1",
                      oPort = 57120,
-                     oLatency = 1,
+                     oLatency = 0.2,
                      oSchedule = Pre MessageStamp,
                      oWindow = Nothing,
                      oHandshake = False,
@@ -23,18 +23,21 @@ let target = Target {oName = "tidalrytm",
     track :: Pattern Int -> Pattern ValueMap -> Pattern ValueMap
     track n p = p # pItrack (n |- 1)
 
-    rytmarg :: Int -> Int -> Pattern Double -> ControlPattern
-    rytmarg cc i v = pI (prestr ++ show (cc + i - 1)) (fmap round $ v |* 127)
+    rytmcc :: Int -> Int -> Pattern Double -> ControlPattern
+    rytmcc cc i v = pI (prestr ++ show (cc + i - 1)) (fmap round $ v |* 127)
+    
+    rytmccInt :: Int -> Pattern Int -> ControlPattern
+    rytmccInt cc v = pI (prestr ++ show cc) v
 
-    perf = rytmarg 35
-    src  = rytmarg 16
-    smpl = rytmarg 24
-    fltr = rytmarg 70
-    amp 7 = rytmarg 11 0
-    amp 8 = rytmarg 8 0
-    amp n = rytmarg 78 n
-    lfo  = rytmarg 102
-    test = rytmarg 0
+    perf = rytmcc 35
+    src  = rytmcc 16
+    smpl = rytmcc 24
+    fltr = rytmcc 70
+    amp 7 = rytmcc 11 0
+    amp 8 = rytmcc 8 0
+    amp n = rytmcc 78 n
+    lfo  = rytmcc 102
+
 
     oscplay = OSC "/rytm" $ ArgList ([
          ("cycle", Just $ VF 0),
@@ -53,7 +56,7 @@ let target = Target {oName = "tidalrytm",
 stream <- startStream defaultConfig oscmap
 
 :{
-let rytm p = streamReplace stream 1 $ stack p
+let rytm = streamReplace stream 1
     hush = streamHush stream
     once = streamOnce stream
     asap = once
