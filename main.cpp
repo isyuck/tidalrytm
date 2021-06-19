@@ -1,10 +1,13 @@
 #include <algorithm>
+#include <bitset>
 #include <chrono>
 #include <condition_variable>
 #include <deque>
 #include <iostream>
 #include <mutex>
+#include <ostream>
 #include <queue>
+#include <sstream>
 #include <string>
 #include <thread>
 
@@ -25,7 +28,20 @@ struct MidiMessage {
   // messages ready to send, e.g. cc and note on
   std::vector<std::vector<unsigned char>> msgs;
 
-  bool operator<(MidiMessage const &o) { return timestamp < o.timestamp; }
+  bool operator<(const MidiMessage &o) const { return timestamp < o.timestamp; }
+
+  friend auto operator<<(std::ostream &os, MidiMessage const &mm)
+      -> std::ostream & {
+    std::stringstream msgostream;
+    for (const auto &msg : mm.msgs) {
+      for (const auto &m : msg) {
+        std::bitset<8> bm(m);
+        msgostream << bm << ' ';
+      }
+      msgostream << '\n';
+    }
+    return os << mm.timestamp.count() << '\n' << msgostream.str();
+  }
 };
 
 // midi out object. handles connecting to devices and sending messsages
@@ -60,7 +76,7 @@ std::mutex midiMutex;
 std::condition_variable midiToSend;
 
 std::queue<osc::ReceivedMessage> oscMessageQueue;
-std::queue<MidiMessage> midiMessageQueue;
+std::priority_queue<MidiMessage, std::vector<MidiMessage>> midiMessageQueue;
 
 class OscReceiver : public osc::OscPacketListener {
 protected:
@@ -75,7 +91,7 @@ protected:
         std::unique_lock<std::mutex> lock(oscMutex);
         bool wasEmpty = oscMessageQueue.empty();
         oscMessageQueue.push(oscMessage);
-        std::cout << "received message!\n";
+        // std::cout << "received message!\n";
         lock.unlock();
         // tell waiting threads theres messages to parse
         if (wasEmpty) {
@@ -92,14 +108,14 @@ protected:
 // pulls osc messages off the osc queue, parses them into midi messages, and
 // pushes them onto the midi to send queue
 void oscToMidi(std::queue<osc::ReceivedMessage> &oscQueue,
-               std::queue<MidiMessage> &midiQueue) {
+               std::priority_queue<MidiMessage> &midiQueue) {
 
   std::unique_lock<std::mutex> oscLock(oscMutex);
 
   while (oscQueue.empty()) {
     oscToParse.wait(oscLock);
   }
-  std::cout << "parsing message!\n";
+  // std::cout << "parsing message!\n";
 
   // temp
   MidiMessage mm;
@@ -152,39 +168,48 @@ void oscToMidi(std::queue<osc::ReceivedMessage> &oscQueue,
   mmsg = {0x90, chan, 127};
   mm.msgs.push_back(mmsg);
 
-  bool wasEmpty = midiQueue.empty();
   std::unique_lock<std::mutex> midiLock(midiMutex);
+  bool wasEmpty = midiQueue.empty();
 
-  std::cout << "parsed message!\n";
+  // std::cout << "parsed message!\n";
   midiQueue.push(mm);
   midiMutex.unlock();
   if (wasEmpty) {
+    // std::cout << "notified!\n";
     midiToSend.notify_one();
   }
 }
 
-void sendMidi(RtMidiOut *midiOut, std::queue<MidiMessage> &queue) {
+void sendMidi(RtMidiOut *midiOut, std::priority_queue<MidiMessage> &queue) {
 
   std::unique_lock<std::mutex> lock(midiMutex);
   // wait for midi messages to send
   while (queue.empty()) {
+    // std::cout << "waiting...\n";
     midiToSend.wait(lock);
   }
-  auto midiMessage = queue.front();
+  while (!queue.empty()) {
+    auto midiMessage = queue.top();
+    std::cout << "\n------------------\n" << midiMessage;
 
-  // get time now
-  const auto timeNow = std::chrono::duration_cast<std::chrono::microseconds>(
-      std::chrono::system_clock::now().time_since_epoch());
+    // get time now
+    const auto timeNow = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::system_clock::now().time_since_epoch());
+    // std::cout << "time now: " << timeNow.count() << '\n';
+    // std::cout << "mm time:  " << midiMessage.timestamp.count() << '\n';
 
-  // only send messages with a timestamp either now, or in the past
-  if (timeNow >= midiMessage.timestamp) {
-    queue.pop();
-    for (const auto &msg : midiMessage.msgs) {
-      midiOut->sendMessage(&msg);
+    // only send messages with a timestamp either now, or in the past
+    if (timeNow >= midiMessage.timestamp) {
+      queue.pop();
+      for (const auto &msg : midiMessage.msgs) {
+        midiOut->sendMessage(&msg);
+      }
+      // std::cout << "sent message!\n";
     }
-    std::cout << "sent message!\n";
+    // std::cout << "message too early!\n";
   }
-  std::cout << "message too early!\n";
+  // std::cout << "---------------------------------\n";
+  lock.unlock();
 }
 
 int main(void) {
