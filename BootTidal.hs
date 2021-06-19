@@ -10,7 +10,7 @@ hSetEncoding stdout utf8
 let target = Target {oName = "tidalrytm",
                      oAddress = "127.0.0.1",
                      oPort = 57120,
-                     oLatency = 0.2,
+                     oLatency = 0.5,
                      oSchedule = Pre MessageStamp,
                      oWindow = Nothing,
                      oHandshake = False,
