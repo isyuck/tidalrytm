@@ -143,7 +143,10 @@ rytm $ stack [
     ]
   ]
 
-  rytm $ stack [ tr 1 $ n "0*16" ]
+  rytm $ stack [ tr "0 1"
+                 $ n "0*16"
+                 # freq rand
+               ]
 
   once $ tr 1 $ n "0"
 
