@@ -3,7 +3,7 @@ CXXFLAGS = -Wall -pedantic -pthread -g -O3 -I /usr/local/include -L /usr/local/l
 LIBS = -loscpack -lrtmidi
 
 all:
-	$(CXX) $(CXXFLAGS) main.cpp -o tidalrytm $(LIBS)
+	$(CXX) $(CXXFLAGS) src/main.cpp -o tidalrytm $(LIBS)
 	@echo "finished building main"
 
 run:

@@ -132,12 +132,21 @@ rytm
 
   rytm $ tr 1 $ n "0(9,16)"
 
+rytm $ stack [
+  tr 1 $ n "2*4"
+  , tr 2 $ within (0.25, 0.75) (off "s" (|+ n "<2 [{2 4 8}%4]>"))
+   $ slow 2 $ n "0*4 4(5,8,2)"
+  , tr 3 $ n "<0 4 2>"
+  , slow 2 $ stack [
+        tr 9 $ n "0(9,16)"
+        , tr 10 $ slow 2 $ n "0(9,16,8)"
+    ]
+  ]
+
+  rytm $ stack [ tr 1 $ n "0*16" ]
+
   once $ tr 1 $ n "0"
 
-rytm $ stack [
-  tr 1 $ n "0 .. 15"
-]
-
-setcps(120/60/4)
+setcps(130/60/4)
 
 hush
