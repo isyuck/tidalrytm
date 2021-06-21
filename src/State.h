@@ -3,16 +3,18 @@
 
 #include <array>
 #include <chrono>
+#include <cstddef>
 #include <ostream>
 
 struct State {
+  State() : channel(NULL), timestamp(0) {}
   State(const unsigned char &_channel,
         const std::chrono::microseconds &_timestamp,
         const std::array<unsigned char, 127> &_cc)
       : channel(_channel), timestamp(_timestamp), cc(_cc) {}
   const unsigned char channel;
   const std::chrono::microseconds timestamp;
-  const std::array<unsigned char, 127> cc;
+  std::array<unsigned char, 127> cc;
 
   friend auto operator<<(std::ostream &o, State const &s) -> std::ostream & {
     o << "State:\n";

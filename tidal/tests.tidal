@@ -143,13 +143,12 @@ rytm $ stack [
     ]
   ]
 
-  rytm $ stack [ tr "0 1"
-                 $ n "0*16"
-                 # freq rand
+  rytm $ stack [
+  tr 1 $ n "0*8" # freq saw
                ]
 
   once $ tr 1 $ n "0"
 
-setcps(130/60/4)
+setcps(120/60/4)
 
 hush
