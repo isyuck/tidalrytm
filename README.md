@@ -1,6 +1,6 @@
 tidalrytm enables control of the analog rytm mkii from tidalcycles, directly over midi.
 
-this is a personal tool, but i thought i'd share it here if it's of any use to anyone `:-)`. it (mostly) works, but needs some optimisation and timing improvements.
+this is a personal tool, but i thought i'd share it here if it's of any use to anyone `:-)`.
 
 i made this because of the way tidal and superdirt currently handle midi control change messages, only allowing one per message.
 
