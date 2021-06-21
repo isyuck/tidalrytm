@@ -11,11 +11,11 @@
 
 class TidalListener : public osc::OscPacketListener {
 public:
-  TidalListener(const char *_addr, std::mutex &_mut,
-                std::condition_variable &_cond)
-      : addr(_addr), mut(_mut), cond(_cond) {}
+  TidalListener(const char *_addr, std::mutex &_outMutex,
+                std::condition_variable &_outAvailable)
+      : addr(_addr), outMutex(_outMutex), outAvailable(_outAvailable) {}
 
-  bool empty() { return this->queue.empty(); }
+  bool empty() const { return this->queue.empty(); }
 
   // get and remove the last element
   osc::ReceivedMessage pop() {
@@ -26,8 +26,8 @@ public:
 
 private:
   std::queue<osc::ReceivedMessage> queue;
-  std::mutex &mut;
-  std::condition_variable &cond;
+  std::mutex &outMutex;
+  std::condition_variable &outAvailable;
   const char *addr;
 
 protected:
@@ -40,14 +40,14 @@ protected:
     try {
       if (std::strcmp(oscMessage.AddressPattern(), this->addr) == 0) {
         // lock access to the queue, and add the latest message
-        std::unique_lock<std::mutex> lock(mut);
+        std::unique_lock<std::mutex> lock(outMutex);
         bool wasEmpty = queue.empty();
         this->queue.push(oscMessage);
         // unlock & tell a thread the queue is no longer empty
         lock.unlock();
         // std::cout << "osc message received\n";
         if (wasEmpty) {
-          cond.notify_one();
+          outAvailable.notify_one();
         }
       }
     } catch (osc::Exception &e) {

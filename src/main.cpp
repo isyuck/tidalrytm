@@ -19,24 +19,29 @@ int main(void) {
 
   std::cout << "starting...\n";
 
-  std::queue<std::vector<unsigned char>> midiMessages;
-  std::mutex midiMessageMutex;
-  std::condition_variable midiMessagesAvailable;
-
+  // messages for the scheduler
   std::queue<std::pair<std::chrono::microseconds,
                        std::vector<std::vector<unsigned char>>>>
       messagesToSched;
   std::mutex messagesToSchedMutex;
   std::condition_variable messagesToSchedAvailable;
 
-  // listen and convert osc from tidal to 'states', a channel, usec timestamp,
-  // and list of cc values
+  // messages to be sent immediately
+  std::queue<std::vector<unsigned char>> midiMessages;
+  std::mutex midiMessageMutex;
+  std::condition_variable midiMessagesAvailable;
+
+  // listen and convert osc from tidal to messages that store a timestamp and
+  // midi control change info, that the scheduler can use
   TidalParser tidalParser(OSCPORT, OSCADDR, messagesToSchedAvailable,
                           messagesToSchedMutex);
 
+  // pull from the queue of parsed messages, and send them to the queue that
+  // midi out pulls from
   Scheduler scheduler(messagesToSchedAvailable, messagesToSchedMutex,
                       midiMessagesAvailable, midiMessageMutex);
 
+  // immediately sends any messages in the midiMessage queue to the rytm
   MidiOut midiOut(MIDIPORT, midiMessagesAvailable, midiMessageMutex);
 
   tidalParser.run(messagesToSched);
