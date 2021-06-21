@@ -45,6 +45,7 @@ protected:
         this->queue.push(oscMessage);
         // unlock & tell a thread the queue is no longer empty
         lock.unlock();
+        // std::cout << "osc message received\n";
         if (wasEmpty) {
           cond.notify_one();
         }

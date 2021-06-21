@@ -5,7 +5,6 @@
 #include "oscpack/osc/OscPacketListener.h"
 #include "oscpack/osc/OscReceivedElements.h"
 
-#include "State.h"
 #include "TidalListener.h"
 
 #include <algorithm>
@@ -20,29 +19,33 @@
 #include <queue>
 #include <string>
 #include <thread>
+#include <utility>
 #include <vector>
+
+using state = std::array<std::array<unsigned char, 127>, 12>;
 
 class TidalParser {
 public:
   // create a listener and a osc socket from port, address, mutex and cond var
   // this is very ugly...
   TidalParser(const int &port, const char *addr,
-              std::condition_variable &_statesAvailable,
-              std::mutex &_statesMutex)
-      : listener(TidalListener(addr, this->oscMutex, this->oscToParse)),
+              std::condition_variable &_outAvailable, std::mutex &_outMutex)
+      : listener(TidalListener(addr, this->inMutex, this->inAvailable)),
         sock(osc::UdpListeningReceiveSocket(
             osc::IpEndpointName(osc::IpEndpointName::ANY_ADDRESS, port),
             &listener)),
-        statesAvailable(_statesAvailable), statesMutex(_statesMutex) {}
+        outAvailable(_outAvailable), outMutex(_outMutex) {}
 
-  void run(std::queue<State> &stateQueue) {
+  void run(std::queue<std::pair<std::chrono::microseconds,
+                                std::vector<std::vector<unsigned char>>>>
+               &messagesToSched) {
     // start listening for osc messages from tidal
     this->listenerThread = std::thread([&]() { this->sock.Run(); });
 
     // spawn n parser threads
     for (int i = 0; i < 8; i++) {
       this->parserThreads.push_back(
-          std::thread([&]() { this->parse(stateQueue); }));
+          std::thread([&]() { this->parse(messagesToSched); }));
     }
   }
 
@@ -68,11 +71,15 @@ private:
   // turns osc messages into states and appends them to the stateQueue,
   // multithreaded
   std::vector<std::thread> parserThreads;
+
   // for locking and notifying waiting threads
-  std::mutex oscMutex;
-  std::condition_variable oscToParse;
-  std::mutex &statesMutex;
-  std::condition_variable &statesAvailable;
+  std::condition_variable inAvailable;
+  std::mutex inMutex;
+  std::condition_variable &outAvailable;
+  std::mutex &outMutex;
+  // the state of all tracks
+  state currentState;
+  std::mutex stateMutex;
 
   void joinListener() { this->listenerThread.join(); }
   void joinParsers() {
@@ -80,20 +87,20 @@ private:
                   [](std::thread &p) { p.join(); });
   }
 
-  void parse(std::queue<State> &stateQueue) {
+  void parse(std::queue<std::pair<std::chrono::microseconds,
+                                  std::vector<std::vector<unsigned char>>>>
+                 &messagesToSched) {
     for (;;) {
       // wait for something to parse
-      std::unique_lock<std::mutex> oscLock(oscMutex);
+      std::unique_lock<std::mutex> inLock(inMutex);
       while (this->listener.empty()) {
-        // std::cout << "waiting for osc messages...\n";
-        oscToParse.wait(oscLock);
+        inAvailable.wait(inLock);
       }
       // the parsing happens here
-      // std::cout << "parsing osc message!\n";
 
       // get a message's args
       auto args = this->listener.pop().ArgumentsBegin();
-      oscLock.unlock();
+      inLock.unlock();
 
       // tidal sends second and microsends as two seperate ints, this converts
       // them into a std::chrono::microseconds object for ease of use
@@ -111,20 +118,37 @@ private:
       // for some reason tidal sends this as a float
       const auto note = (int)(args++)->AsFloat();
 
-      // pull all control changes into an array
-      std::array<unsigned char, 127> cc;
-      for (int i = 0; i < 127; i++) {
-        // std::vector<unsigned char> cc{0xb0 | chan, i + 1, v};
-        cc[i] = (unsigned char)(args++)->AsInt32();
+      // TODO 12 mutex for each array
+      stateMutex.lock();
+      std::array<unsigned char, 127> prevState = currentState[chan];
+      stateMutex.unlock();
+
+      std::vector<std::vector<unsigned char>> changes;
+      for (unsigned char ccn = 0; ccn < 127; ccn++) {
+        const auto ccv = (unsigned char)(args++)->AsInt32();
+        if (prevState[ccn] != ccv) {
+          changes.push_back(
+              {(unsigned char)(0xb0 | chan), (unsigned char)(ccn + 1), ccv});
+          prevState[ccn] = ccv;
+        }
       }
+      // change note cc
+      changes.push_back(
+          {(unsigned char)(0xb0 | chan), 3, (unsigned char)(note + 60)});
+      // note on
+      changes.push_back({0x90, (unsigned char)chan, 127});
+
+      stateMutex.lock();
+      currentState[chan] = prevState;
+      stateMutex.unlock();
 
       // add to the state queue and notify any threads waiting for new states
-      std::unique_lock<std::mutex> stateLock(statesMutex);
-      bool wasEmpty = stateQueue.empty();
-      stateQueue.push(State(chan, timestamp, cc));
-      stateLock.unlock();
+      std::unique_lock<std::mutex> outLock(outMutex);
+      bool wasEmpty = messagesToSched.empty();
+      messagesToSched.push(std::make_pair(timestamp, changes));
+      outLock.unlock();
       if (wasEmpty) {
-        statesAvailable.notify_one();
+        outAvailable.notify_one();
       }
     }
   }

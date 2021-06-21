@@ -2,7 +2,6 @@
 
 #include "MidiOut.h"
 #include "Scheduler.h"
-#include "StateHandler.h"
 #include "TidalParser.h"
 
 #include <array>
@@ -20,10 +19,6 @@ int main(void) {
 
   std::cout << "starting...\n";
 
-  std::queue<State> statesToParse;
-  std::mutex statesToParseMutex;
-  std::condition_variable statesToParseAvailable;
-
   std::queue<std::vector<unsigned char>> midiMessages;
   std::mutex midiMessageMutex;
   std::condition_variable midiMessagesAvailable;
@@ -36,24 +31,19 @@ int main(void) {
 
   // listen and convert osc from tidal to 'states', a channel, usec timestamp,
   // and list of cc values
-  TidalParser tidalParser(OSCPORT, OSCADDR, statesToParseAvailable,
-                          statesToParseMutex);
-
-  StateHandler stateHandler(statesToParseAvailable, statesToParseMutex,
-                            messagesToSchedAvailable, messagesToSchedMutex);
+  TidalParser tidalParser(OSCPORT, OSCADDR, messagesToSchedAvailable,
+                          messagesToSchedMutex);
 
   Scheduler scheduler(messagesToSchedAvailable, messagesToSchedMutex,
                       midiMessagesAvailable, midiMessageMutex);
 
   MidiOut midiOut(MIDIPORT, midiMessagesAvailable, midiMessageMutex);
 
-  tidalParser.run(statesToParse);
-  stateHandler.run(statesToParse, messagesToSched);
+  tidalParser.run(messagesToSched);
   scheduler.run(messagesToSched, midiMessages);
   midiOut.run(midiMessages);
 
   tidalParser.join();
-  stateHandler.join();
   scheduler.join();
   midiOut.join();
 }
