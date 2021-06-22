@@ -1,24 +1,24 @@
 #ifndef SCHEDULER_H_
 #define SCHEDULER_H_
 
+#include "Queue.h"
+
 #include <chrono>
 #include <condition_variable>
 #include <queue>
 #include <thread>
 #include <vector>
 
-class Scheduler {
+template <class OT> class Scheduler {
 public:
   Scheduler(std::condition_variable &_inAvailable, std::mutex &_inMutex,
-            std::condition_variable &_outAvailable, std::mutex &_outMutex)
-      : inAvailable(_inAvailable), inMutex(_inMutex),
-        outAvailable(_outAvailable), outMutex(_outMutex){};
+            Queue<OT> &_outQueue)
+      : inAvailable(_inAvailable), inMutex(_inMutex), outQueue(_outQueue) {}
 
   // the out queue is for messages that need to be immediately sent
   void
   run(std::queue<std::pair<std::chrono::microseconds,
-                           std::vector<std::vector<unsigned char>>>> &inQueue,
-      std::queue<std::vector<unsigned char>> &outQueue) {
+                           std::vector<std::vector<unsigned char>>>> &inQueue) {
 
     this->mainThread = std::thread([&]() {
       for (;;) {
@@ -38,14 +38,8 @@ public:
         if (timeNow >= el.first) {
           inLock.lock();
           inQueue.pop();
-          std::unique_lock<std::mutex> outLock(outMutex);
-          bool wasEmpty = outQueue.empty();
           for (const auto &e : el.second) {
-            outQueue.push(e);
-          }
-          outLock.unlock();
-          if (wasEmpty) {
-            outAvailable.notify_one();
+            this->outQueue.push(e);
           }
           inLock.unlock();
         }
@@ -58,8 +52,7 @@ private:
   std::thread mainThread;
   std::condition_variable &inAvailable;
   std::mutex &inMutex;
-  std::condition_variable &outAvailable;
-  std::mutex &outMutex;
+  Queue<OT> &outQueue;
 };
 
 #endif // SCHEDULER_H_

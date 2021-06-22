@@ -3,17 +3,17 @@
 
 #include <rtmidi/RtMidi.h>
 
+#include "Queue.h"
+
 #include <condition_variable>
 #include <mutex>
 #include <queue>
 #include <thread>
 #include <vector>
 
-class MidiOut {
+template <class IT> class MidiOut {
 public:
-  MidiOut(const int port, std::condition_variable &_inAvailable,
-          std::mutex &_inMutex)
-      : inMutex(_inMutex), inAvailable(_inAvailable) {
+  MidiOut(const int port, Queue<IT> &_inQueue) : inQueue(_inQueue) {
 
     try {
       midiOut = new RtMidiOut();
@@ -36,36 +36,27 @@ public:
     std::cout << "\nopening port #" << port << '\n';
   };
 
-  void run(std::queue<std::vector<unsigned char>> &midiMessages) {
+  void run() {
     this->mainThread = std::thread([&]() {
       for (;;) {
-        this->sendMessages(midiMessages);
+        this->sendMessages();
       }
     });
   }
   void join() { this->mainThread.join(); }
 
 private:
-  std::condition_variable &inAvailable;
-  std::mutex &inMutex;
+  Queue<IT> &inQueue;
   std::thread mainThread;
   RtMidiOut *midiOut;
 
-  void sendMessages(std::queue<std::vector<unsigned char>> &messages) const {
-    std::unique_lock<std::mutex> lock(inMutex);
-    while (messages.empty()) {
-      inAvailable.wait(lock);
-    }
+  void sendMessages() const {
+    const auto message = this->inQueue.waitForLatest();
+    this->inQueue.pop();
 
-    auto message = messages.front();
-    messages.pop();
-    lock.unlock();
-
-    std::cout << "midi out! ccn: " << +message[1] << ", ccv: " << +message[2]
-              << '\n';
-    for (auto &m : message) {
-      this->midiOut->sendMessage(&message);
-    }
+    // std::cout << "midi out! ccn: " << +message[1] << ", ccv: " << +message[2]
+    //           << '\n';
+    this->midiOut->sendMessage(&message);
   }
 };
 
