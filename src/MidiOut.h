@@ -13,7 +13,7 @@
 
 template <class IT> class MidiOut {
 public:
-  MidiOut(const int port, Queue<IT> &_inQueue) : inQueue(_inQueue) {
+  MidiOut(const int port, Queue<IT> &in) : in(in) {
 
     try {
       midiOut = new RtMidiOut();
@@ -22,6 +22,7 @@ public:
       error.printMessage();
       std::exit(EXIT_FAILURE);
     }
+
     std::string portName = "";
     const auto nPorts = midiOut->getPortCount();
     std::cout << nPorts << " out ports:\n";
@@ -33,31 +34,25 @@ public:
       }
       std::cout << " #" << i << ": " << portName << '\n';
     }
-    std::cout << "\nopening port #" << port << '\n';
+    std::cout << "\nopened port #" << port << '\n';
   };
 
+  // send messages to the rytm
   void run() {
-    this->mainThread = std::thread([&]() {
+    this->thread = std::thread([&]() {
       for (;;) {
-        this->sendMessages();
+        const auto msg = in.wait();
+        in.pop();
+        this->midiOut->sendMessage(&msg);
       }
     });
   }
-  void join() { this->mainThread.join(); }
+  void join() { this->thread.join(); }
 
 private:
-  Queue<IT> &inQueue;
-  std::thread mainThread;
+  Queue<IT> &in;
+  std::thread thread;
   RtMidiOut *midiOut;
-
-  void sendMessages() const {
-    const auto message = this->inQueue.wait();
-    this->inQueue.pop();
-
-    // std::cout << "midi out! ccn: " << +message[1] << ", ccv: " << +message[2]
-    //           << '\n';
-    this->midiOut->sendMessage(&message);
-  }
 };
 
 #endif // MIDIOUT

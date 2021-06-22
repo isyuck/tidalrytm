@@ -5,29 +5,18 @@
 #include "oscpack/osc/OscPacketListener.h"
 #include "oscpack/osc/OscReceivedElements.h"
 
+#include "Queue.h"
+
 #include <condition_variable>
 #include <iostream>
 #include <queue>
 
-class TidalListener : public osc::OscPacketListener {
+template <class OT> class TidalListener : public osc::OscPacketListener {
 public:
-  TidalListener(const char *_addr, std::mutex &_outMutex,
-                std::condition_variable &_outAvailable)
-      : addr(_addr), outMutex(_outMutex), outAvailable(_outAvailable) {}
-
-  bool empty() const { return this->queue.empty(); }
-
-  // get and remove the last element
-  osc::ReceivedMessage pop() {
-    const auto el = queue.front();
-    this->queue.pop();
-    return el;
-  }
+  TidalListener(const char *_addr, Queue<OT> &out) : addr(_addr), out(out) {}
 
 private:
-  std::queue<osc::ReceivedMessage> queue;
-  std::mutex &outMutex;
-  std::condition_variable &outAvailable;
+  Queue<OT> &out;
   const char *addr;
 
 protected:
@@ -39,16 +28,7 @@ protected:
     // is the one we want)
     try {
       if (std::strcmp(oscMessage.AddressPattern(), this->addr) == 0) {
-        // lock access to the queue, and add the latest message
-        std::unique_lock<std::mutex> lock(outMutex);
-        bool wasEmpty = queue.empty();
-        this->queue.push(oscMessage);
-        // unlock & tell a thread the queue is no longer empty
-        lock.unlock();
-        // std::cout << "osc message received\n";
-        if (wasEmpty) {
-          outAvailable.notify_one();
-        }
+        out.push(oscMessage);
       }
     } catch (osc::Exception &e) {
       std::cout << "error while parsing message: "

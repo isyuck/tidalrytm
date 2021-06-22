@@ -130,7 +130,9 @@ rytm
   tr 10 $ n "0*4" # freq (rn 0.8 1 $ rand)
   ]
 
-  rytm $ tr 1 $ n "0(9,16)"
+  rytm $ stack [
+  tr 1 $ n "0*8"
+               ]
 
 rytm $ stack [
   tr 1 $ n "2*4"

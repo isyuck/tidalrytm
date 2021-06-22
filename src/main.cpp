@@ -27,15 +27,18 @@ int main(void) {
   Queue<tidalMessage> tidalMessages;
   Queue<midiMessage> midiMessages;
 
+  // listen and parse osc from tidal into a timestamped midi message
   TidalParser<tidalMessage> tidalParser(OSCPORT, OSCADDR, tidalMessages);
 
+  // pulls from the midi messages and send to midiout when appropriate
   Scheduler<tidalMessage, midiMessage> scheduler(tidalMessages, midiMessages);
 
   // immediately sends any messages in the midiMessage queue to the rytm
   MidiOut<midiMessage> midiOut(MIDIPORT, midiMessages);
 
-  tidalParser.run();
-  scheduler.run();
+  // arg is n threads
+  tidalParser.run(8);
+  scheduler.run(8);
   midiOut.run();
 
   tidalParser.join();

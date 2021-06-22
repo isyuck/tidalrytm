@@ -29,63 +29,48 @@ template <class OT> class TidalParser {
 public:
   // create a listener and a osc socket from port, address, mutex and cond var
   // this is very ugly...
-  TidalParser(const int &port, const char *addr, Queue<OT> &_outQueue)
-      : listener(TidalListener(addr, this->inMutex, this->inAvailable)),
+  TidalParser(const int &port, const char *addr, Queue<OT> &out)
+      : listener(TidalListener<osc::ReceivedMessage>(addr, this->in)),
         sock(osc::UdpListeningReceiveSocket(
             osc::IpEndpointName(osc::IpEndpointName::ANY_ADDRESS, port),
             &listener)),
-        outQueue(_outQueue) {}
+        out(out) {}
 
-  void run() {
+  void run(const int nThreads = 1) {
     // start listening for osc messages from tidal
     this->listenerThread = std::thread([&]() { this->sock.Run(); });
 
     // spawn n parser threads
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < nThreads; i++) {
       this->parserThreads.push_back(std::thread([&]() { this->parse(); }));
     }
   }
 
   void join() {
     this->joinListener();
-    this->joinParsers();
-  }
-
-private:
-  // listens for osc messages
-  TidalListener listener;
-  std::thread listenerThread;
-  osc::UdpListeningReceiveSocket sock;
-  // turns osc messages into states and appends them to the stateQueue,
-  // multithreaded
-  std::vector<std::thread> parserThreads;
-
-  // for locking and notifying waiting threads
-  std::condition_variable inAvailable;
-  std::mutex inMutex;
-  Queue<OT> &outQueue;
-  // the state of all tracks
-  state currentState;
-  std::mutex stateMutex;
-
-  void joinListener() { this->listenerThread.join(); }
-  void joinParsers() {
     std::for_each(this->parserThreads.begin(), this->parserThreads.end(),
                   [](std::thread &p) { p.join(); });
   }
 
+private:
+  // listens for osc messages
+  TidalListener<osc::ReceivedMessage> listener;
+  std::thread listenerThread;
+  osc::UdpListeningReceiveSocket sock;
+  std::vector<std::thread> parserThreads;
+
+  // io queues
+  Queue<osc::ReceivedMessage> in;
+  Queue<OT> &out;
+  // the state of all tracks
+  state currentState;
+  std::mutex stateMutex;
+
+  // turns osc into a type easier for us to use
   void parse() {
     for (;;) {
-      // wait for something to parse
-      std::unique_lock<std::mutex> inLock(inMutex);
-      while (this->listener.empty()) {
-        inAvailable.wait(inLock);
-      }
-      // the parsing happens here
-
-      // get a message's args
-      auto args = this->listener.pop().ArgumentsBegin();
-      inLock.unlock();
+      auto args = in.wait().ArgumentsBegin();
+      in.pop();
 
       // tidal sends second and microsends as two seperate ints, this converts
       // them into a std::chrono::microseconds object for ease of use
@@ -127,9 +112,12 @@ private:
       currentState[chan] = prevState;
       stateMutex.unlock();
 
-      this->outQueue.push(std::make_pair(timestamp, changes));
+      out.push(std::make_pair(timestamp, changes));
     }
   }
+
+  void joinListener() { this->listenerThread.join(); }
+  void joinParsers() {}
 };
 
 #endif // TIDALPARSER_H_
