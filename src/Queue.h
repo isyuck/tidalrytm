@@ -7,12 +7,14 @@
 
 template <class T> class Queue {
 
-public:
+private:
   std::queue<T> queue;
   std::mutex mtx;
   std::condition_variable cv;
 
-  void push(const T v) {
+public:
+  // push and notify waiting all threads
+  void push(const T &v) {
     std::unique_lock<std::mutex> lock(this->mtx);
     const bool wasEmpty = this->queue.empty();
     this->queue.push(v);
@@ -20,13 +22,15 @@ public:
       cv.notify_one();
     }
   }
-  T waitForLatest() {
+  // pause the current thread until notified of a new push
+  T wait() {
     std::unique_lock<std::mutex> lock(this->mtx);
     while (this->queue.empty()) {
       cv.wait(lock);
     }
     return this->queue.front();
   }
+
   void pop() {
     std::unique_lock<std::mutex> lock(this->mtx);
     this->queue.pop();

@@ -51,7 +51,7 @@ private:
   RtMidiOut *midiOut;
 
   void sendMessages() const {
-    const auto message = this->inQueue.waitForLatest();
+    const auto message = this->inQueue.wait();
     this->inQueue.pop();
 
     // std::cout << "midi out! ccn: " << +message[1] << ", ccv: " << +message[2]

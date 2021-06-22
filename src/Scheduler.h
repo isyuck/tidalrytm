@@ -11,8 +11,7 @@
 
 template <class IT, class OT> class Scheduler {
 public:
-  Scheduler(Queue<IT> &_inQueue, Queue<OT> &_outQueue)
-      : inQueue(_inQueue), outQueue(_outQueue) {}
+  Scheduler(Queue<IT> &in, Queue<OT> &out) : in(in), out(out) {}
 
   // the out queue is for messages that need to be immediately sent
   // TODO multithread this
@@ -20,7 +19,7 @@ public:
     this->mainThread = std::thread([&]() {
       for (;;) {
         // pause this thread here unless there is a new message available
-        const auto message = this->inQueue.waitForLatest();
+        const auto message = in.wait();
 
         // TODO maybe loop with the current element here? and break when sent
 
@@ -32,9 +31,9 @@ public:
         // check timestamp (first in pair) of the message, if it's in the past
         // send the message to the midi queue
         if (timeNow >= message.first) {
-          this->inQueue.pop();
+          in.pop();
           for (const auto &e : message.second) {
-            this->outQueue.push(e);
+            out.push(e);
           }
         }
       }
@@ -44,8 +43,8 @@ public:
 
 private:
   std::thread mainThread;
-  Queue<IT> &inQueue;
-  Queue<OT> &outQueue;
+  Queue<IT> &in;
+  Queue<OT> &out;
 };
 
 #endif // SCHEDULER_H_
