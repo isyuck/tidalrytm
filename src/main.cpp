@@ -24,26 +24,18 @@ using midiMessage = std::vector<unsigned char>;
 
 int main(void) {
 
-  // messages for the scheduler
-  std::queue<std::pair<std::chrono::microseconds,
-                       std::vector<std::vector<unsigned char>>>>
-      messagesToSched;
-  std::mutex messagesToSchedMutex;
-  std::condition_variable messagesToSchedAvailable;
-
+  Queue<tidalMessage> tidalMessages;
   Queue<midiMessage> midiMessages;
 
-  TidalParser tidalParser(OSCPORT, OSCADDR, messagesToSchedAvailable,
-                          messagesToSchedMutex);
+  TidalParser<tidalMessage> tidalParser(OSCPORT, OSCADDR, tidalMessages);
 
-  Scheduler<midiMessage> scheduler(messagesToSchedAvailable,
-                                   messagesToSchedMutex, midiMessages);
+  Scheduler<tidalMessage, midiMessage> scheduler(tidalMessages, midiMessages);
 
   // immediately sends any messages in the midiMessage queue to the rytm
   MidiOut<midiMessage> midiOut(MIDIPORT, midiMessages);
 
-  tidalParser.run(messagesToSched);
-  scheduler.run(messagesToSched);
+  tidalParser.run();
+  scheduler.run();
   midiOut.run();
 
   tidalParser.join();

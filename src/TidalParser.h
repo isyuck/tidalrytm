@@ -5,6 +5,7 @@
 #include "oscpack/osc/OscPacketListener.h"
 #include "oscpack/osc/OscReceivedElements.h"
 
+#include "Queue.h"
 #include "TidalListener.h"
 
 #include <algorithm>
@@ -24,28 +25,24 @@
 
 using state = std::array<std::array<unsigned char, 127>, 12>;
 
-class TidalParser {
+template <class OT> class TidalParser {
 public:
   // create a listener and a osc socket from port, address, mutex and cond var
   // this is very ugly...
-  TidalParser(const int &port, const char *addr,
-              std::condition_variable &_outAvailable, std::mutex &_outMutex)
+  TidalParser(const int &port, const char *addr, Queue<OT> &_outQueue)
       : listener(TidalListener(addr, this->inMutex, this->inAvailable)),
         sock(osc::UdpListeningReceiveSocket(
             osc::IpEndpointName(osc::IpEndpointName::ANY_ADDRESS, port),
             &listener)),
-        outAvailable(_outAvailable), outMutex(_outMutex) {}
+        outQueue(_outQueue) {}
 
-  void run(std::queue<std::pair<std::chrono::microseconds,
-                                std::vector<std::vector<unsigned char>>>>
-               &messagesToSched) {
+  void run() {
     // start listening for osc messages from tidal
     this->listenerThread = std::thread([&]() { this->sock.Run(); });
 
     // spawn n parser threads
     for (int i = 0; i < 8; i++) {
-      this->parserThreads.push_back(
-          std::thread([&]() { this->parse(messagesToSched); }));
+      this->parserThreads.push_back(std::thread([&]() { this->parse(); }));
     }
   }
 
@@ -53,15 +50,6 @@ public:
     this->joinListener();
     this->joinParsers();
   }
-
-  // State pop() {
-  //   const auto el = stateQueue.front();
-  //   std::cout << "state queue has " << stateQueue.size() << "elements\n";
-  //   this->stateQueue.pop();
-  //   return el;
-  // }
-
-  // bool empty() { return this->stateQueue.empty(); }
 
 private:
   // listens for osc messages
@@ -75,8 +63,7 @@ private:
   // for locking and notifying waiting threads
   std::condition_variable inAvailable;
   std::mutex inMutex;
-  std::condition_variable &outAvailable;
-  std::mutex &outMutex;
+  Queue<OT> &outQueue;
   // the state of all tracks
   state currentState;
   std::mutex stateMutex;
@@ -87,9 +74,7 @@ private:
                   [](std::thread &p) { p.join(); });
   }
 
-  void parse(std::queue<std::pair<std::chrono::microseconds,
-                                  std::vector<std::vector<unsigned char>>>>
-                 &messagesToSched) {
+  void parse() {
     for (;;) {
       // wait for something to parse
       std::unique_lock<std::mutex> inLock(inMutex);
@@ -142,14 +127,7 @@ private:
       currentState[chan] = prevState;
       stateMutex.unlock();
 
-      // add to the state queue and notify any threads waiting for new states
-      std::unique_lock<std::mutex> outLock(outMutex);
-      bool wasEmpty = messagesToSched.empty();
-      messagesToSched.push(std::make_pair(timestamp, changes));
-      outLock.unlock();
-      if (wasEmpty) {
-        outAvailable.notify_one();
-      }
+      this->outQueue.push(std::make_pair(timestamp, changes));
     }
   }
 };

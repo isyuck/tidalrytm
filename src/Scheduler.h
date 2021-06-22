@@ -9,39 +9,33 @@
 #include <thread>
 #include <vector>
 
-template <class OT> class Scheduler {
+template <class IT, class OT> class Scheduler {
 public:
-  Scheduler(std::condition_variable &_inAvailable, std::mutex &_inMutex,
-            Queue<OT> &_outQueue)
-      : inAvailable(_inAvailable), inMutex(_inMutex), outQueue(_outQueue) {}
+  Scheduler(Queue<IT> &_inQueue, Queue<OT> &_outQueue)
+      : inQueue(_inQueue), outQueue(_outQueue) {}
 
   // the out queue is for messages that need to be immediately sent
-  void
-  run(std::queue<std::pair<std::chrono::microseconds,
-                           std::vector<std::vector<unsigned char>>>> &inQueue) {
-
+  // TODO multithread this
+  void run() {
     this->mainThread = std::thread([&]() {
       for (;;) {
-        std::unique_lock<std::mutex> inLock(inMutex);
-        while (inQueue.empty()) {
-          // std::cout << "waiting for states...\n";
-          inAvailable.wait(inLock);
-        }
-        // std::cout << "doing something with a state!\n";
-        const auto el = inQueue.front();
-        inLock.unlock();
+        // pause this thread here unless there is a new message available
+        const auto message = this->inQueue.waitForLatest();
 
+        // TODO maybe loop with the current element here? and break when sent
+
+        // get the time now in microseconds
         const auto timeNow =
             std::chrono::duration_cast<std::chrono::microseconds>(
                 std::chrono::system_clock::now().time_since_epoch());
 
-        if (timeNow >= el.first) {
-          inLock.lock();
-          inQueue.pop();
-          for (const auto &e : el.second) {
+        // check timestamp (first in pair) of the message, if it's in the past
+        // send the message to the midi queue
+        if (timeNow >= message.first) {
+          this->inQueue.pop();
+          for (const auto &e : message.second) {
             this->outQueue.push(e);
           }
-          inLock.unlock();
         }
       }
     });
@@ -50,8 +44,7 @@ public:
 
 private:
   std::thread mainThread;
-  std::condition_variable &inAvailable;
-  std::mutex &inMutex;
+  Queue<IT> &inQueue;
   Queue<OT> &outQueue;
 };
 
