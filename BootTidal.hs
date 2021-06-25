@@ -18,26 +18,25 @@ let target = Target {oName = "tidalrytm",
 
     prestr = "rt"
 
-    pItrack = pI "track"
+    -- pItrack = pI "track"
 
-    track :: Pattern Int -> Pattern ValueMap -> Pattern ValueMap
-    track n p = p # pItrack (n |- 1)
+    -- track :: Pattern Int -> Pattern ValueMap -> Pattern ValueMap
+    -- track n p = p # pItrack (n |- 1)
 
-    rytmcc :: Int -> Int -> Pattern Double -> ControlPattern
-    rytmcc cc i v = pI (prestr ++ show (cc + i - 1)) (fmap round $ v |* 127)
-    
-    rytmccInt :: Int -> Pattern Int -> ControlPattern
-    rytmccInt cc v = pI (prestr ++ show cc) v
+    -- rytmcc :: Int -> Int -> Pattern Double -> ControlPattern
+    -- rytmcc cc i v = pI (prestr ++ show (cc + i - 1)) (fmap round $ v |* 127)
 
-    perf = rytmcc 35
-    src  = rytmcc 16
-    smpl = rytmcc 24
-    fltr = rytmcc 70
-    amp 7 = rytmcc 11 0
-    amp 8 = rytmcc 8 0
-    amp n = rytmcc 78 n
-    lfo  = rytmcc 102
+    -- rytmccInt :: Int -> Pattern Int -> ControlPattern
+    -- rytmccInt cc v = pI (prestr ++ show cc) v
 
+    -- perf = rytmcc 35
+    -- src  = rytmcc 16
+    -- smpl = rytmcc 24
+    -- fltr = rytmcc 70
+    -- amp 7 = rytmcc 11 0
+    -- amp 8 = rytmcc 8 0
+    -- amp n = rytmcc 78 n
+    -- lfo  = rytmcc 102
 
     oscplay = OSC "/rytm" $ ArgList ([
          ("cycle", Just $ VF 0),
@@ -48,7 +47,7 @@ let target = Target {oName = "tidalrytm",
          ("track", Just $ VI 0),
          ("n", Just $ VF 0)
         ]
-      ++ (map (\x -> (prestr ++ show x, Just $ VI (-1))) [1..127]))
+      ++ (map (\x -> (prestr ++ show x, Just $ VF (-1))) [1..127]))
 
     oscmap = [(target, [oscplay])]
 :}
