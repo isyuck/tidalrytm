@@ -95,7 +95,7 @@ private:
 
       std::vector<std::vector<unsigned char>> changes;
       for (unsigned char ccn = 0; ccn < 127; ccn++) {
-        const auto ccv = (unsigned char)(args++)->AsInt32();
+        const unsigned char ccv = (unsigned char)((args++)->AsFloat() * 127);
         if (prevState[ccn] != ccv) {
           changes.push_back(
               {(unsigned char)(0xb0 | chan), (unsigned char)(ccn + 1), ccv});
