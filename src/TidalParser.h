@@ -72,7 +72,7 @@ private:
       auto args = in.wait().ArgumentsBegin();
       in.pop();
 
-      // tidal sends second and microsends as two seperate ints, this converts
+      // tidal sends seconds and microsecs as two seperate ints, this converts
       // them into a std::chrono::microseconds object for ease of use
       const auto sec = std::chrono::seconds((args++)->AsInt32());
       const auto usec = std::chrono::microseconds((args++)->AsInt32());

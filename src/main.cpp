@@ -25,7 +25,9 @@ using tidalMessage = std::pair<std::chrono::microseconds,
 
 using midiMessage = std::vector<unsigned char>;
 
-int main(void) {
+int main(int argc, char **argv) {
+
+  // TODO use args for optional vis osc
 
   Queue<tidalMessage> tidalMessages;
   Queue<midiMessage> midiMessages;
@@ -38,10 +40,6 @@ int main(void) {
 
   // immediately sends any messages in the midiMessage queue to the rytm
   MidiOut<midiMessage> midiOut(MIDIPORT, midiMessages);
-
-  SendOsc sendOsc(OUTPORT, OUTADDR);
-
-  sendOsc.send();
 
   // arg is n threads
   tidalParser.run(8);

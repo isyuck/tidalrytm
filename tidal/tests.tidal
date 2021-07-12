@@ -207,3 +207,7 @@ t9 = track 9
 t10 = track 10
 t11 = track 11
 t12 = track 12
+
+rytm $ t1 $ n "0*4"
+
+hush

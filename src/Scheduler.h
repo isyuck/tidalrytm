@@ -2,6 +2,7 @@
 #define SCHEDULER_H_
 
 #include "Queue.h"
+#include "QueueConsumer.h"
 
 #include <algorithm>
 #include <chrono>
@@ -10,51 +11,33 @@
 #include <thread>
 #include <vector>
 
-template <class IT, class OT> class Scheduler {
+template <class IT, class OT> class Scheduler : public QueueConsumer<IT, OT> {
 public:
-  Scheduler(Queue<IT> &in, Queue<OT> &out) : in(in), out(out) {}
+  using QueueConsumer<IT, OT>::QueueConsumer;
 
-  // the out queue is for messages that need to be immediately sent
-  // TODO multithread this
-  void run(const int nThreads = 1) {
-    for (int i = 0; i < nThreads; i++) {
-      this->threads.push_back(std::thread([&]() { this->schedule(); }));
-    }
-  }
-  void join() {
-    std::for_each(this->threads.begin(), this->threads.end(),
-                  [](std::thread &p) { p.join(); });
-  }
+protected:
+  void main() {
+    // pause this thread here unless there is a new message available
+    const auto msg = this->wait();
 
-private:
-  void schedule() {
+    // keep checking whether the current message we have needs to be sent
     for (;;) {
-      // pause this thread here unless there is a new message available
-      const auto msg = in.wait();
 
-      // keep checking whether the current message we have needs to be sent
-      for (;;) {
+      // get the time now in microseconds
+      const auto now = std::chrono::duration_cast<std::chrono::microseconds>(
+          std::chrono::system_clock::now().time_since_epoch());
 
-        // get the time now in microseconds
-        const auto now = std::chrono::duration_cast<std::chrono::microseconds>(
-            std::chrono::system_clock::now().time_since_epoch());
-
-        // check timestamp (first in pair) of the message, if it's in the past
-        // send the message to the midi queue
-        if (now >= msg.first) {
-          in.pop();
-          for (const auto &cc : msg.second) {
-            out.push(cc);
-          }
-          break;
+      // check timestamp (first in pair) of the message, if it's in the past
+      // send the message to the midi queue
+      if (now >= msg.first) {
+        this->pop();
+        for (const auto &cc : msg.second) {
+          this->push(cc);
         }
+        break;
       }
     }
   }
-
-  std::vector<std::thread> threads;
-  Queue<IT> &in;
-  Queue<OT> &out;
 };
 
 #endif // SCHEDULER_H_
