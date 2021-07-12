@@ -4,12 +4,29 @@
 #include "Queue.h"
 
 #include <algorithm>
+#include <functional>
+#include <optional>
 #include <thread>
 
 // IT = in type of queue, OT = out type
-template <class IT, class OT> class QueueConsumer {
+template <class IT = int, class OT = int> class QueueConsumer {
 public:
-  explicit QueueConsumer(Queue<IT> &in, Queue<OT> &out) : in(in), out(out) {}
+  // these constructors handle queue optionality
+  // in only
+  explicit QueueConsumer(std::reference_wrapper<Queue<IT>> in)
+      : in(std::make_optional<std::reference_wrapper<Queue<IT>>>(in)),
+        out(std::nullopt) {}
+
+  // out only
+  explicit QueueConsumer(std::reference_wrapper<Queue<OT>> out)
+      : in(std::nullopt),
+        out(std::make_optional<std::reference_wrapper<Queue<OT>>>(out)) {}
+
+  // in and out
+  explicit QueueConsumer(std::reference_wrapper<Queue<IT>> in,
+                         std::reference_wrapper<Queue<OT>> out)
+      : in(std::make_optional<std::reference_wrapper<Queue<IT>>>(in)),
+        out(std::make_optional<std::reference_wrapper<Queue<OT>>>(out)) {}
 
   //  start n threads, running main() 'forever'
   void run(const int n = 1) {
@@ -33,18 +50,20 @@ protected:
 
   // pause the thread until a new IT is in the in queue
   constexpr IT wait() {
-    const IT e = this->in.wait();
+    const IT e = this->in.value().get().wait();
     return e;
   }
 
   // pop from the in queue
-  constexpr void pop() { this->in.pop(); }
+  constexpr void pop() { this->in.value().get().pop(); }
 
   // push to the out queue
-  constexpr void push(const OT &e) { this->out.push(e); }
+  constexpr void push(const OT &e) { this->out.value().get().push(e); }
 
-  Queue<IT> &in;
-  Queue<OT> &out;
+  // both queues are optional
+  std::optional<std::reference_wrapper<Queue<IT>>> in;
+  std::optional<std::reference_wrapper<Queue<OT>>> out;
+
   std::vector<std::thread> threads;
 };
 

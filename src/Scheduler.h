@@ -4,13 +4,6 @@
 #include "Queue.h"
 #include "QueueConsumer.h"
 
-#include <algorithm>
-#include <chrono>
-#include <condition_variable>
-#include <queue>
-#include <thread>
-#include <vector>
-
 template <class IT, class OT> class Scheduler : public QueueConsumer<IT, OT> {
 public:
   using QueueConsumer<IT, OT>::QueueConsumer;

@@ -4,17 +4,13 @@
 #include <rtmidi/RtMidi.h>
 
 #include "Queue.h"
+#include "QueueConsumer.h"
 
-#include <condition_variable>
-#include <mutex>
-#include <queue>
-#include <thread>
-#include <vector>
-
-template <class IT> class MidiOut {
+template <class IT> class MidiOut : public QueueConsumer<IT, int> {
 public:
-  MidiOut(const int port, Queue<IT> &in) : in(in) {
+  using QueueConsumer<IT, int>::QueueConsumer;
 
+  void openPort(const int port) {
     try {
       midiOut = new RtMidiOut();
       midiOut->openPort(port);
@@ -22,36 +18,18 @@ public:
       error.printMessage();
       std::exit(EXIT_FAILURE);
     }
-
-    std::string portName = "";
-    const auto nPorts = midiOut->getPortCount();
-    std::cout << nPorts << " out ports:\n";
-    for (unsigned int i = 0; i < nPorts; i++) {
-      try {
-        portName = midiOut->getPortName(i);
-      } catch (RtMidiError &error) {
-        error.printMessage();
-      }
-      std::cout << " #" << i << ": " << portName << '\n';
-    }
-    std::cout << "\nopened port #" << port << '\n';
-  };
+    std::cout << "opened port #" << port << " (" << midiOut->getPortName(port)
+              << ")\n";
+  }
 
   // send messages to the rytm
-  void run() {
-    this->thread = std::thread([&]() {
-      for (;;) {
-        const auto msg = in.wait();
-        in.pop();
-        this->midiOut->sendMessage(&msg);
-      }
-    });
+  void main() {
+    const auto msg = this->wait();
+    this->pop();
+    this->midiOut->sendMessage(&msg);
   }
-  void join() { this->thread.join(); }
 
 private:
-  Queue<IT> &in;
-  std::thread thread;
   RtMidiOut *midiOut;
 };
 

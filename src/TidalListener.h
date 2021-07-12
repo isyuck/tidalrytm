@@ -7,16 +7,13 @@
 
 #include "Queue.h"
 
-#include <condition_variable>
-#include <iostream>
-#include <queue>
-
-template <class OT> class TidalListener : public osc::OscPacketListener {
+class TidalListener : public osc::OscPacketListener {
 public:
-  TidalListener(const char *_addr, Queue<OT> &out) : addr(_addr), out(out) {}
+  TidalListener(const char *_addr, Queue<osc::ReceivedMessage> &out)
+      : out(out), addr(_addr) {}
 
 private:
-  Queue<OT> &out;
+  Queue<osc::ReceivedMessage> &out;
   const char *addr;
 
 protected:
@@ -28,7 +25,7 @@ protected:
     // is the one we want)
     try {
       if (std::strcmp(oscMessage.AddressPattern(), this->addr) == 0) {
-        out.push(oscMessage);
+        this->out.push(oscMessage);
       }
     } catch (osc::Exception &e) {
       std::cout << "error while parsing message: "

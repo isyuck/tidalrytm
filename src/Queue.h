@@ -5,7 +5,7 @@
 #include <mutex>
 #include <queue>
 
-template <class T> class Queue {
+template <class T = int> class Queue {
 
 private:
   std::queue<T> queue;
