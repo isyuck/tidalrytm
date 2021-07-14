@@ -7,12 +7,25 @@
 
 template <class T = int> class Queue {
 
-private:
-  std::queue<T> queue;
-  std::mutex mtx;
-  std::condition_variable cv;
-
 public:
+  Queue<T>() {}
+  Queue<T>(const std::queue<T> &q) { this->queue = q; }
+
+  Queue<T> operator=(const Queue<T> &q) {
+    std::unique_lock<std::mutex> lock(this->mtx);
+    return this->queue;
+  }
+
+  bool operator==(const Queue<T> &q) {
+    std::unique_lock<std::mutex> lock(this->mtx);
+    return this->queue == q.queue;
+  }
+
+  bool operator!=(const Queue<T> &q) {
+    std::unique_lock<std::mutex> lock(this->mtx);
+    return this->queue != q.queue;
+  }
+
   // push and notify waiting all threads
   void push(const T &v) {
     std::unique_lock<std::mutex> lock(this->mtx);
@@ -35,6 +48,11 @@ public:
     std::unique_lock<std::mutex> lock(this->mtx);
     this->queue.pop();
   }
+
+private:
+  std::queue<T> queue;
+  std::mutex mtx;
+  std::condition_variable cv;
 };
 
 #endif // QUEUE_H_

@@ -2,47 +2,45 @@
 #define SENDOSC_H_
 
 #include "Queue.h"
+#include "QueueConsumer.h"
 
 #include "oscpack/ip/UdpSocket.h"
 #include "oscpack/osc/OscOutboundPacketStream.h"
+#include <oscpack/ip/IpEndpointName.h>
 #include <oscpack/osc/OscTypes.h>
-
-#include <thread>
 
 #define OUTPUT_BUFFER_SIZE 1024
 
-template <class IT> class SendOsc {
+template <class IT> class SendOsc : public QueueConsumer<IT, int> {
 public:
-  SendOsc(const int &port, const char *addr, Queue<IT> &in)
-      : transmit(osc::IpEndpointName("127.0.0.1", port)), addr(addr), in(in),
-        ps(this->buffer, OUTPUT_BUFFER_SIZE) {}
+  using QueueConsumer<IT>::QueueConsumer;
 
-  void run() {
-    this->thread = std::thread([&]() {
-      for (;;) {
+  // SendOsc(std::reference_wrapper<Queue<IT>> in)
+  //     : QueueConsumer<IT, int>(in),
+  //       transmit(osc::IpEndpointName("127.0.0.1", 7788)) {}
 
-        const auto msg = in.wait();
-        in.pop();
+  void main() {
+    const auto msg = this->wait();
+    this->pop();
 
-        ps << osc::BeginMessage(addr);
-        for (const auto &m : msg) {
-          ps << m;
-        }
-        ps << osc::EndMessage;
+    osc::OutboundPacketStream ps(this->buffer, OUTPUT_BUFFER_SIZE);
 
-        this->transmit.Send(ps.Data(), ps.Size());
-        this->ps.Clear();
-      }
-    });
+    ps << osc::BeginBundleImmediate << osc::BeginMessage(addr);
+    for (const auto &m : msg) {
+      ps << m;
+    }
+    ps << osc::EndMessage;
+    ps << osc::EndBundle;
+
+    this->transmit.Send(ps.Data(), ps.Size());
   }
 
 private:
-  Queue<IT> &in;
-  osc::UdpTransmitSocket transmit;
+  // osc::UdpTransmitSocket transmit;
+  osc::UdpTransmitSocket transmit =
+      osc::UdpTransmitSocket(osc::IpEndpointName("127.0.0.1", 7788));
   char buffer[OUTPUT_BUFFER_SIZE];
-  osc::OutboundPacketStream ps;
-  const char *addr;
-  std::thread thread;
+  const char *addr = "/rytmvis";
 };
 
 #endif // SENDOSC_H_
