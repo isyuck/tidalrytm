@@ -1,4 +1,4 @@
-`tidalrytm` extends the midi capability of tidal, specifically for the analog rytm mkii.
+`tidalrytm` extends the midi capability of tidal (by replacing SuperDirt & SuperCollider) specifically for the analog rytm mkii.
 
 it depends on `oscpack` and `RtMidi`
 
