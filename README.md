@@ -30,6 +30,8 @@ rytm $ stack [
   t "ch*16" # machine "chmetal ch"
              ]
 
+-- affect fx
+
 fx $ stack [
   distort 64
   ,
