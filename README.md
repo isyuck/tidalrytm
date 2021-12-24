@@ -30,6 +30,14 @@ rytm $ stack [
   t "ch*16" # machine "chmetal ch"
              ]
 
+fx $ stack [
+  distort 64
+  ,
+  makeup (segment 4 $ irange 0 30 $ slow 4 sine)
+  ,
+  compmix 127 # ratio "max" # sidechan "hit" # threshold 127
+           ]
+
 -- conditional functions on a stack of tracks
 
 rytm
