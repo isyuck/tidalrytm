@@ -1,9 +1,7 @@
 `tidalrytm` extends the midi capability of tidal, specifically for the analog rytm mkii.
 
-build:
-depends on `oscpack` and `RtMidi`
-`make`
+it depends on `oscpack` and `RtMidi`
 
-usage:
-start tidal with the `BootTidal.hs` provided
-`./tidalrytm`
+build with `make`
+
+run by starting tidal with the `BootTidal.hs` provided, and then `./tidalrytm`
