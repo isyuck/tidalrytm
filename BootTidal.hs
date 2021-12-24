@@ -3,8 +3,10 @@
 
 import Sound.Tidal.Context
 import Text.Printf
-
+import Data.List
+import Data.Maybe
 import System.IO (hSetEncoding, stdout, utf8)
+
 hSetEncoding stdout utf8
 
 :{
@@ -25,7 +27,8 @@ stream <- startStream defaultConfig oscmap
 
 :{
 let rytm = streamReplace stream 1
-    clok = streamReplace stream 2
+    fx   = streamReplace stream 2 . (# trackN 13)
+    clok = streamReplace stream 3
     hush = streamHush stream
     once = streamOnce stream
     asap = once
@@ -33,20 +36,12 @@ let rytm = streamReplace stream 1
       asap $ cps c
       clok $ n "0*96" # trackN 65
 
-    trackMap :: String -> Int
-    trackMap "bd" = 1
-    trackMap "sd" = 2
-    trackMap "rs" = 3
-    trackMap "cp" = 4
-    trackMap "bt" = 5
-    trackMap "lt" = 6
-    trackMap "mt" = 7
-    trackMap "ht" = 8
-    trackMap "ch" = 9
-    trackMap "oh" = 10
-    trackMap "cy" = 11
-    trackMap "cb" = 12
-    trackMap _ = 30
+    patFindIndex :: Int -> [String] -> Pattern String -> Pattern Int
+    patFindIndex d ss = fmap (\s -> fromMaybe d $ findIndex (== s) ss)
+
+    -- bd = 0, sd = 1, .. cb = 11
+    trackMap :: Pattern String -> Pattern Int
+    trackMap = (+ 1) . patFindIndex 0 ["bd", "sd", "rs", "cp", "bt", "lt", "mt", "ht", "ch", "oh", "cy", "cb"]
 
     pItrack = pI "track"
 
@@ -54,7 +49,7 @@ let rytm = streamReplace stream 1
     trackN n = pItrack (n |- 1)
 
     track :: Pattern String -> ControlPattern
-    track p = trackN (fmap trackMap p)
+    track = trackN . trackMap
 
     t :: Pattern String -> ControlPattern
     t = track
@@ -87,39 +82,35 @@ let rytm = streamReplace stream 1
     rytmcc :: Int -> Int -> Pattern Int -> ControlPattern
     rytmcc cc i = pI (printf "cc%03d" (cc + i - 1))
 
-    -- offset range for envelopes, tunes, etc
-    rerange :: Pattern Int -> Pattern Int -> Pattern Int
-    rerange n pat = (pat |+ n)
-
     -- useful for midi remapping, e.g.
     -- irange 0 127 $ slow 2 sine
     irange x y = fmap round . range x y
 
     -- banks of cc's
-    perf = rytmcc 35
-    src  = rytmcc 16
-    smpl = rytmcc 24
-    fltr = rytmcc 70
+    perf  = rytmcc 35
+    src   = rytmcc 16
+    smpl  = rytmcc 24
+    fltr  = rytmcc 70
     amp 7 = rytmcc 11 0
     amp 8 = rytmcc 8 0
     amp n = rytmcc 78 n
-    lfo  = rytmcc 102
+    lfo   = rytmcc 102
 
     -- for controlling the dual osc machine
-    vtune v = rytmcc 17 1 (v + 64)
-    vdetune v = rytmcc 17 4 (v + 64)
-    vwav = rytmcc 15 7
-    vbal v = rytmcc 17 3 (v + 64)
+    vtune   = rytmcc 17 1 . (+ 64)
+    vdetune = rytmcc 17 4 . (+ 64)
+    vwav    = rytmcc 15 7
+    vbal    = rytmcc 17 3 . (+ 64)
 
     -- amp page
-    attack = amp 1
-    hold = amp 2
-    decay = amp 3
-    over = amp 4
-    od = over
-    verb = amp 6
-    pan = rytmcc 11 0 . rerange 64
-    gain = rytmcc 8 0
+    attack  = amp 1
+    hold    = amp 2
+    decay   = amp 3
+    over    = amp 4
+    od      = over
+    verb    = amp 6
+    pan     = rytmcc 11 0 . (+ 64)
+    gain    = rytmcc 8 0
 
     -- filter page
     fatt = fltr 1
@@ -127,73 +118,86 @@ let rytm = streamReplace stream 1
     fsus = fltr 3
     frel = fltr 4
     freq = fltr 5
-    res = fltr 6
-    ftype' = fltr 7
-    fenv = fltr 8 . rerange 64
+    res  = fltr 6
+    ftype = fltr 7 . patFindIndex 0 ["lp2", "lp1", "bp", "hp1", "hp2", "bs", "pk"]
+    fenv  = fltr 8 . (+ 64)
 
-    -- allows patterning of filter type, by string
-    ftype :: Pattern String -> ControlPattern
-    ftype = ftype' . fmap ftypeMap
-      where ftypeMap :: String -> Int
-            ftypeMap "lp2" = 0
-            ftypeMap "lp1" = 1
-            ftypeMap "bp" = 2
-            ftypeMap "hp1" = 3
-            ftypeMap "hp2" = 4
-            ftypeMap "bs" = 5
-            ftypeMap "pk" = 6
-
-    smpltune = smpl 1 . rerange 64
+    -- sample page
+    smpltune = smpl 1 . (+ 64)
     smplfine = smpl 2
-    stune = smpltune
-    sfine = smplfine
-    crush = smpl 3
-    bank = smpl 4
-    begin = smpl 5
-    start = begin
-    end = smpl 6
-
+    crush    = smpl 3
+    bank     = smpl 4
+    start    = smpl 5
+    end      = smpl 6
     -- TODO bools for looping
-    -- loop :: Pattern Bool -> ControlPattern
-    loop = smpl 7
-    smplvol = smpl 8
+    loop     = smpl 7
+    smplvol  = smpl 8
 
-    lfospeed = lfo 1 . rerange 64
-    lfomul' = lfo 2
-    lfodepth = lfo 8 . rerange 64
+    -- lfo page
+    lfospeed = lfo 1 . (+ 64)
+    lfomul'  = lfo 2
+    lfodepth = lfo 8 . (+ 64)
 
     -- easier control of lfo multiplier, takes a pattern of bools (true for mul,
     -- false for div), and a pattern of values (listed below)
 
     -- n "0*2" # r "bd" # lfomul "t f" "1k 4"
-
     lfomul :: Pattern Bool -> Pattern String -> ControlPattern
     lfomul b p = lfomul' $ sew b mp (fmap (+ 12) mp)
-      where mp = fmap lfomulMap p
-            lfomulMap :: String -> Int
-            lfomulMap "1" = 0
-            lfomulMap "2" = 1
-            lfomulMap "4" = 2
-            lfomulMap "8" = 3
-            lfomulMap "16" = 4
-            lfomulMap "32" = 5
-            lfomulMap "64" = 6
-            lfomulMap "128" = 7
-            lfomulMap "256" = 8
-            lfomulMap "512" = 9
-            lfomulMap "1k" = 10
-            lfomulMap "2k" = 11
+      where mp = patFindIndex 0 ["1", "2", "4", "8", "16", "32", "64", "128", "256", "512", "1k", "2k"] p
 
-    -- for accessing the cc banks
-    -- as labelled on the rytm
-    a = 0
-    b = 1
-    c = 2
-    d = 3
-    e = 4
-    f = 5
-    g = 6
-    h = 7
+    fxdelay = rytmcc 16
+    delayt = fxdelay 1
+    delaypp :: Pattern Bool -> ControlPattern
+    delaypp  = fxdelay 2 . fmap fromEnum
+    delayw   = fxdelay 3 . (+ 64)
+    delayfb  = fxdelay 4 . fmap (round . (* 0.63))
+    delayhpf = fxdelay 5
+    delaylpf = fxdelay 6
+    delayrev = fxdelay 7
+    delayvol = fxdelay 8
+
+    fxverb   = rytmcc 25
+    verbpre  = fxverb 0
+    verbdec  = fxverb 1
+    verbfrq  = fxverb 2
+    verbgain = fxverb 3
+    verbhpf  = fxverb 4
+    verblpf  = fxverb 5
+    verbvol  = fxverb 6
+
+    ppMap "pre"  = 0
+    ppMap "post" = 1
+    ppMap _ = 0
+
+    fxdist    = rytmcc 71
+    distort   = fxdist 0
+    symmetry  = fxdist 1 . (+ 64)
+    delayover = fxdist 2
+    delaydist = fxdist 6 . fmap ppMap
+    verbdist  = fxdist 7 . fmap ppMap
+
+    ratioMap "1:2" = 0
+    ratioMap "1:4" = 1
+    ratioMap "1:8" = 2
+    ratioMap "max" = 3
+    ratioMap _ = 0
+    seqMap "off" = 0
+    seqMap "lpf" = 1
+    seqMap "hpf" = 2
+    seqMap "hit" = 3
+    seqMap _ = 0
+    fxcomp = rytmcc 78
+    threshold = fxcomp 1
+    -- TODO better mapping for attack & decay
+    compattack = fxcomp 2
+    compdecay  = fxcomp 3
+    makeup     = fxcomp 4
+    ratio :: Pattern String -> ControlPattern
+    ratio      = fxcomp 5 . fmap ratioMap
+    sidechan   = fxcomp 6 . fmap seqMap
+    compmix    = fxcomp 7
+    compvol    = fxcomp 8
 
     -- replace tidal's `sound` with one that changes
     -- the machine on the rytm
