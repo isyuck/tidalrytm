@@ -1,51 +1,52 @@
+setcps(130/60/4) -- also starts midiclock send to the rytm
+
+-- `track` (or `t`) replaces tidal's `sound`
+
+rytm $ track "bd ch"
+
+rytm $ t "ch*16" # n "<0 4 8 12>"
+
+-- new functions for the rytm (default tidal only allows 1 midi CC per msg)
+
+rytm $ t "bt*8" # freq "32 64 78 127" # res 40
+
+-- change machine inside patterns
+
+rytm $ stack [
+  t "bt*8" # freq "32 64 78 127" # res 40
+  ,
+  t "ch*16" # machine "chmetal ch"
+             ]
+
+-- conditional functions on a stack of tracks
+
 rytm
-  $ degrade
-  $ chunk 4 (ply 4 . slow 4)
-  $ every 3 (within (0, 0.5) (solo "[9,10]"))
-  $ every 4 (struct "t*8 t*4 t*2 t(3,8)")
+  $ every 4 (solo "ch")
+  $ sometimes (fixtr "bt" (|+ n 8))
   $ stack [
-  bd $ n "0(3,8)"
+  t "bt*8" # freq "32 64 78 127" # res 40
   ,
-  sd $ n "0*8 4*8" # freq (midirange 0 127 $ slow 4 sine)
+  t "ch*16" # m "chmetal ch"
   ,
-  cp $ n "0*<4 2 1 0>"
-  ,
-  ch $ n "0*32"
-  ,
-  oh $ n "0(5,8,2)"
-          ]
+  t "oh*4"
+             ]
 
-
-vtune v = rytmcc 17 1 (v + 64)
-vdetune v = rytmcc 17 4 (v + 64)
-vwav = rytmcc 15 7
-vbal v = rytmcc 17 3 (v + 64)
+-- switch from lp1 to hp1 filter type for all tracks
+-- sweep filter freq for all tracks
 
 rytm
-  -- $ (# vtune "-12 0 12 0")
-  $ fast 16
+  $ (# ftype "lp1 hp1")
+  $ (# freq (irange 30 127 $ slow 2 sine))
   $ stack [
-  (# freq (midirange 39 100 $ slow 2 perlin))
-  $ struct "t(5,8) t*4" . slow 4
-  $ (# vwav (midirange 0 127 $ rand))
-  $ sd $ n "0(9,16)" # attack 0 # fenv "{-10 10}%8" # vtune 0
+  t "bt*8" # freq "32 64 78 127" # res 40 # fenv "<-30 30>"
   ,
-  whenmod 7 5 (density 0) $ bd $ n "0*4"
+  t "ch*16" # m "chmetal ch"
   ,
-  whenmod 5 3 (density 0) $ stack [
-  ch $ n "{0 4 2}%<8 4>"
+  t "oh*4"
   ,
-  oh $ n "0 12(3,8)"
-        ]
-  ,
-  cp $ n "0*2"
-          ]
+  ("e" ~>) $ t "cp"
+             ]
 
-
-  $ slow 4 $ sd $ n "{a c g e}(5,8)"
-  # freq (midirange 60 127 $ slow 2 sine)
-  # res (midirange 0 64 $ slow 3 sine) # hold 127
-
-setcps(150/60/4)
+-- more functions in `BootTidal.hs`
 
 hush

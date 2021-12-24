@@ -11,7 +11,7 @@ hSetEncoding stdout utf8
 let target = Target {oName = "tidalrytm",
                      oAddress = "127.0.0.1",
                      oPort = 57120,
-                     oLatency = 0.75,
+                     oLatency = 0.5,
                      oSchedule = Pre MessageStamp,
                      oWindow = Nothing,
                      oHandshake = False,
@@ -31,34 +31,50 @@ let rytm = streamReplace stream 1
     asap = once
     setcps c = do -- sends midi clock on cps change
       asap $ cps c
-      clok $ track 65 $ n "0*96"
+      clok $ n "0*96" # trackN 65
+
+    trackMap :: String -> Int
+    trackMap "bd" = 1
+    trackMap "sd" = 2
+    trackMap "rs" = 3
+    trackMap "cp" = 4
+    trackMap "bt" = 5
+    trackMap "lt" = 6
+    trackMap "mt" = 7
+    trackMap "ht" = 8
+    trackMap "ch" = 9
+    trackMap "oh" = 10
+    trackMap "cy" = 11
+    trackMap "cb" = 12
+    trackMap _ = 30
 
     pItrack = pI "track"
 
-    (!!!) :: [a] -> Int -> a
-    (!!!) xs n = xs !! (n `mod` length xs)
+    trackN :: Pattern Int -> ControlPattern
+    trackN n = pItrack (n |- 1)
 
-    -- alias for channel
-    track :: Pattern Int -> Pattern ValueMap -> Pattern ValueMap
-    track n p = p # pItrack (n |- 1)
-    tr = track
+    track :: Pattern String -> ControlPattern
+    track p = trackN (fmap trackMap p)
 
-    -- mute a track "n", or a list "[n1, n2]"
-    mute :: Pattern Int -> ControlPattern -> ControlPattern
-    mute n = fix (struct "") (pItrack (n - 1))
+    t :: Pattern String -> ControlPattern
+    t = track
 
-    -- solo a track "n", or a list "[n1, n2]"
-    solo :: Pattern Int -> ControlPattern -> ControlPattern
-    solo n = unfix (struct "") (pItrack (n - 1))
+    -- mute a track "t", or a list "[t1, t2]"
+    mute :: Pattern String -> ControlPattern -> ControlPattern
+    mute t = fix (struct "") (track t)
+
+    -- solo a track "t", or a list "[t1, t2]"
+    solo :: Pattern String -> ControlPattern -> ControlPattern
+    solo t = unfix (struct "") (track t)
 
     -- mute a track within a cycle
-    mutew t n = within t (mute n)
+    mutew s n = within s (mute n)
 
     -- solo a track within a cycle
-    solow t n = within t (solo n)
+    solow s n = within s (solo n)
 
     -- alias for fix but for a track
-    fixtr t f = fix f (pItrack (t |- 1))
+    fixtr t f = fix f (track t)
 
     -- a mix of fixtr and pickF
     fixpick t i fs = fixtr t (pickF i fs)
@@ -75,7 +91,9 @@ let rytm = streamReplace stream 1
     rerange :: Pattern Int -> Pattern Int -> Pattern Int
     rerange n pat = (pat |+ n)
 
-    midirange x y = fmap round . range x y
+    -- useful for midi remapping, e.g.
+    -- irange 0 127 $ slow 2 sine
+    irange x y = fmap round . range x y
 
     -- banks of cc's
     perf = rytmcc 35
@@ -87,12 +105,11 @@ let rytm = streamReplace stream 1
     amp n = rytmcc 78 n
     lfo  = rytmcc 102
 
-
     -- for controlling the dual osc machine
-    vtune v = rytmcc 17 (v + 64)
-    vdetune v = rytmcc 20 (v + 64)
-    vwav = rytmcc 21
-    vbal = rytmcc 20 0
+    vtune v = rytmcc 17 1 (v + 64)
+    vdetune v = rytmcc 17 4 (v + 64)
+    vwav = rytmcc 15 7
+    vbal v = rytmcc 17 3 (v + 64)
 
     -- amp page
     attack = amp 1
@@ -148,7 +165,7 @@ let rytm = streamReplace stream 1
     -- easier control of lfo multiplier, takes a pattern of bools (true for mul,
     -- false for div), and a pattern of values (listed below)
 
-    -- rytm $ tr 1 $ n "0*2" # lfomul "t f" "1k 4"
+    -- n "0*2" # r "bd" # lfomul "t f" "1k 4"
 
     lfomul :: Pattern Bool -> Pattern String -> ControlPattern
     lfomul b p = lfomul' $ sew b mp (fmap (+ 12) mp)
@@ -180,9 +197,9 @@ let rytm = streamReplace stream 1
 
     -- replace tidal's `sound` with one that changes
     -- the machine on the rytm
-    sound :: Pattern String -> ControlPattern
-    sound = rytmcc 15 1 . fmap machineMap
-    s = sound
+    machine :: Pattern String -> ControlPattern
+    machine = rytmcc 15 1 . fmap machineMap
+    m = machine
     machineMap :: String -> Int
     machineMap "bdhard" = 0
     machineMap "bd" = 0
@@ -222,33 +239,7 @@ let rytm = streamReplace stream 1
     machineMap "vco" = 28
     machineMap "dualvco" = 28
     machineMap _ = 0
-
-    -- aliases for tracks
-    bd = track 1
-    sd = track 2
-    cp = track 4
-    bt = track 5
-    lt = track 6
-    mt = track 7
-    ht = track 8
-    ch = track 9
-    oh = track 10
-    cy = track 11
-    cb = track 12
-
-    t1 = track 1
-    t2 = track 2
-    t3 = track 3
-    t4 = track 4
-    t5 = track 5
-    t6 = track 6
-    t7 = track 7
-    t8 = track 8
-    t9 = track 9
-    t10 = track 10
-    t11 = track 11
-    t12 = track 12
 :}
 
-:set prompt "tidal-rytm> "
+:set prompt "tidalrytm> "
 :set prompt-cont ""
