@@ -39,6 +39,9 @@ let rytm = streamReplace stream 1
     patFindIndex :: Int -> [String] -> Pattern String -> Pattern Int
     patFindIndex d ss = fmap (\s -> fromMaybe d $ findIndex (== s) ss)
 
+    clamp :: (Ord a) => a -> a -> a -> a
+    clamp mn mx = max mn . min mx
+
     -- bd = 0, sd = 1, .. cb = 11
     trackMap :: Pattern String -> Pattern Int
     trackMap = (+ 1) . patFindIndex 0 ["bd", "sd", "rs", "cp", "bt", "lt", "mt", "ht", "ch", "oh", "cy", "cb"]
@@ -53,6 +56,19 @@ let rytm = streamReplace stream 1
 
     t :: Pattern String -> ControlPattern
     t = track
+
+    -- note change as a rytm cc
+    ncc :: Pattern Note -> ControlPattern
+    ncc = rytmcc 0 4 . fmap (round . unNote) . (+ 60)
+
+    -- rytm mapped note
+    note :: Pattern Note -> ControlPattern
+    note = pN "n" . clamp 12 59 . (+ 36)
+    n = note
+
+    -- generic midinote
+    midinote :: Pattern Note -> ControlPattern
+    midinote = pN "n"
 
     -- mute a track "t", or a list "[t1, t2]"
     mute :: Pattern String -> ControlPattern -> ControlPattern

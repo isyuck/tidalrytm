@@ -41,7 +41,8 @@ protected:
       const timestamp ts = sec + usec;
 
       unsigned char track = 0;
-      unsigned char note = 0;
+      unsigned char note = 36;
+      unsigned char velocity = 127;
       std::vector<std::pair<unsigned char, unsigned char>> ccs;
       ccs.reserve(128);
 
@@ -59,6 +60,9 @@ protected:
 
           } else if (s == "n") {
             note = (arg++)->AsFloat();
+
+          } else if (s == "velocity") {
+            velocity = (arg++)->AsFloat();
           }
           break;
         }
@@ -87,22 +91,16 @@ protected:
 
         // all ccs
         for (const auto &cc : ccs) {
-          mm[0] = 0xb0 | track;
+          mm[0] = 0xB0 | track;
           mm[1] = cc.first;
           mm[2] = cc.second;
           mb.push_back(mm);
         }
 
-        // note change (..?)
-        mm[0] = 0xB0 | track;
-        mm[1] = 0x03;
-        mm[2] = 0x3C + note;
-        mb.push_back(mm);
-
         // note on
         mm[0] = 0x90 | track;
-        mm[1] = track;
-        mm[2] = 0x7F;
+        mm[1] = note;
+        mm[2] = velocity;
         mb.push_back(mm);
       }
 
