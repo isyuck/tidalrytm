@@ -4,6 +4,8 @@ it depends on `oscpack` and `RtMidi`
 
 build with `make`
 
+(see this [issue](https://github.com/isyuck/tidalrytm/issues/1) to build for M1 macs)
+
 run by starting tidal with the `BootTidal.hs` provided, and then `./tidalrytm`
 
 
